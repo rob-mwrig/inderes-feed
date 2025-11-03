@@ -1,0 +1,34 @@
+name: Update Inderes RSS feed
+on:
+  schedule:
+    - cron: "0 */2 * * *"  # aja kahden tunnin välein
+  workflow_dispatch:        # mahdollistaa manuaalisen ajon
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Inderes data
+        run: |
+          curl -s "https://ir-api.inderes.com/api/v1/publications?languages=fi&startDate=$(date -I -d '-7 days')" \
+            -H "accept: application/json" \
+            -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
+            -o data.json
+
+      - name: Build RSS feed
+        run: |
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > feed.xml
+          echo '<rss version="2.0"><channel><title>Inderes Publications</title><link>https://ir.inderes.fi</link>' >> feed.xml
+          echo '<description>Automated feed built from Inderes API</description>' >> feed.xml
+          jq -r '.[] | "<item><title>\(.title)</title><link>\(.url)</link><pubDate>\(.publishedAt)</pubDate><description><![CDATA[\(.lead)]]></description></item>"' data.json >> feed.xml
+          echo '</channel></rss>' >> feed.xml
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add feed.xml
+          git commit -m "Update feed $(date)" || echo "No changes"
+          git push
