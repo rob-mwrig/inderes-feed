@@ -1,35 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Robit News</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <title>Robit – News</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      margin: 1.5em;
+      background-color: #fff;
+      color: #111;
+    }
+    h2 {
+      color: #004b8d;
+      border-bottom: 2px solid #004b8d;
+      padding-bottom: 0.3em;
+      margin-bottom: 1em;
+    }
+    .feed-item {
+      margin-bottom: 1.2em;
+      padding-bottom: 0.8em;
+      border-bottom: 1px solid #ddd;
+    }
+    .feed-item a {
+      color: #004b8d;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .feed-item a:hover {
+      text-decoration: underline;
+    }
+    .pubDate {
+      color: gray;
+      font-size: 0.85em;
+      margin-top: 0.2em;
+    }
+  </style>
 </head>
 <body>
-<h2>Robit – News</h2>
-<div id="feed"></div>
+  <h2>Robit – News</h2>
+  <div id="feed">Loading feed…</div>
 
-<script>
-const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-en.xml';
+  <script>
+    const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-en.xml';
+    const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
 
-fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`)
-  .then(res => res.json())
-  .then(data => {
-    const container = document.getElementById('feed');
-    data.items.forEach(item => {
-      const div = document.createElement('div');
-      div.className = 'feed-item';
-      div.innerHTML = `
-        <a href="${item.link}" target="_blank">${item.title}</a>
-        <div class="pubDate">${new Date(item.pubDate).toLocaleDateString('en-GB')}</div>
-      `;
-      container.appendChild(div);
-    });
-  })
-  .catch(err => {
-    document.getElementById('feed').innerHTML = 'Feed unavailable.';
-    console.error(err);
-  });
-</script>
+    fetch(apiUrl)
+      .then(res => res.json())
+      .then(data => {
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(data.contents, "text/xml");
+        const items = xml.querySelectorAll("item");
+        const container = document.getElementById("feed");
+        container.innerHTML = "";
+
+        if (items.length === 0) {
+          container.textContent = "No news available.";
+          return;
+        }
+
+        items.forEach(item => {
+          const title = item.querySelector("title")?.textContent || "";
+          const link = item.querySelector("link")?.textContent || "#";
+          const pubDateRaw = item.querySelector("pubDate")?.textContent || "";
+          const pubDate = pubDateRaw ? new Date(pubDateRaw).toLocaleDateString("en-GB") : "";
+
+          const div = document.createElement("div");
+          div.className = "feed-item";
+          div.innerHTML = `
+            <a href="${link}" target="_blank">${title}</a>
+            <div class="pubDate">${pubDate}</div>
+          `;
+          container.appendChild(div);
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        document.getElementById("feed").textContent = "Feed unavailable.";
+      });
+  </script>
 </body>
 </html>
