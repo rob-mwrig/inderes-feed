@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<title>Robit Uutiset</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h2>Robit – Pörssitiedotteet</h2>
+<div id="feed"></div>
+
+<script>
+const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-fi.xml';
+
+fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`)
+  .then(res => res.json())
+  .then(data => {
+    const container = document.getElementById('feed');
+    data.items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      div.innerHTML = `
+        <a href="${item.link}" target="_blank">${item.title}</a>
+        <div class="pubDate">${new Date(item.pubDate).toLocaleDateString('fi-FI')}</div>
+      `;
+      container.appendChild(div);
+    });
+  })
+  .catch(err => {
+    document.getElementById('feed').innerHTML = 'Syötettä ei voitu ladata.';
+    console.error(err);
+  });
+</script>
+</body>
+</html>
