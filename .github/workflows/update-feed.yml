@@ -1,7 +1,7 @@
-name: Update and Publish Inderes RSS feeds
+name: Update and Publish Inderes RSS feeds (titles only)
 on:
   schedule:
-    - cron: "0 */2 * * *"   # joka toinen tunti
+    - cron: "0 */2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -31,8 +31,8 @@ jobs:
             -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
             -o data-en.json
 
-      # 📦 RAKENNA FEEDIT
-      - name: Build RSS feeds
+      # 📦 RAKENNA FEEDIT (ilman sisältöä)
+      - name: Build minimal RSS feeds
         run: |
           mkdir -p public
 
@@ -41,14 +41,13 @@ jobs:
           echo '<rss version="2.0"><channel>' >> public/feed-fi.xml
           echo '<title>Inderes Publications (FI)</title>' >> public/feed-fi.xml
           echo '<link>https://ir.inderes.fi</link>' >> public/feed-fi.xml
-          echo '<description>Inderes-julkaisut suomeksi</description>' >> public/feed-fi.xml
+          echo '<description>Inderes-julkaisut suomeksi – otsikot ja linkit</description>' >> public/feed-fi.xml
           jq -r '.publications[] |
             "<item>
               <title>\(.title | gsub("&"; "&amp;"))</title>
               <link>https://www.inderes.fi/releases/\(.id)</link>
               <guid>\(.id)</guid>
               <pubDate>\(.createdAt)</pubDate>
-              <description><![CDATA[\(.html)]]></description>
             </item>"' data-fi.json >> public/feed-fi.xml
           echo '</channel></rss>' >> public/feed-fi.xml
 
@@ -57,14 +56,13 @@ jobs:
           echo '<rss version="2.0"><channel>' >> public/feed-en.xml
           echo '<title>Inderes Publications (EN)</title>' >> public/feed-en.xml
           echo '<link>https://ir.inderes.fi</link>' >> public/feed-en.xml
-          echo '<description>Inderes publications in English</description>' >> public/feed-en.xml
+          echo '<description>Inderes publications in English – titles and links only</description>' >> public/feed-en.xml
           jq -r '.publications[] |
             "<item>
               <title>\(.title | gsub("&"; "&amp;"))</title>
               <link>https://www.inderes.fi/releases/\(.id)</link>
               <guid>\(.id)</guid>
               <pubDate>\(.createdAt)</pubDate>
-              <description><![CDATA[\(.html)]]></description>
             </item>"' data-en.json >> public/feed-en.xml
           echo '</channel></rss>' >> public/feed-en.xml
 
