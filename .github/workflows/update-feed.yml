@@ -36,6 +36,7 @@ jobs:
       # 📦 Rakenna feedit + sivut
       - name: Build feeds and viewer pages
         run: |
+          touch public/.nojekyll
           mkdir -p public
 
           # --- Finnish feed ---
