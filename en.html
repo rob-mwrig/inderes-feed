@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Robit News</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h2>Robit – News</h2>
+<div id="feed"></div>
+
+<script>
+const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-en.xml';
+
+fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`)
+  .then(res => res.json())
+  .then(data => {
+    const container = document.getElementById('feed');
+    data.items.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'feed-item';
+      div.innerHTML = `
+        <a href="${item.link}" target="_blank">${item.title}</a>
+        <div class="pubDate">${new Date(item.pubDate).toLocaleDateString('en-GB')}</div>
+      `;
+      container.appendChild(div);
+    });
+  })
+  .catch(err => {
+    document.getElementById('feed').innerHTML = 'Feed unavailable.';
+    console.error(err);
+  });
+</script>
+</body>
+</html>
