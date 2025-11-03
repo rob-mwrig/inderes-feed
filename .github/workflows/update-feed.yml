@@ -1,8 +1,13 @@
-name: Update Inderes RSS feed
+name: Update and Publish Inderes RSS feeds
 on:
   schedule:
-    - cron: "0 */2 * * *"  # aja kahden tunnin välein
+    - cron: "0 */2 * * *"   # joka toinen tunti
   workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build:
@@ -10,38 +15,77 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch Inderes data
+      # 🟦 HAE SUOMENKIELINEN DATA
+      - name: Fetch Inderes data (FI)
         run: |
           curl -s "https://ir-api.inderes.com/api/v1/publications?languages=fi&startDate=$(date -I -d '-7 days')" \
             -H "accept: application/json" \
             -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
-            -o data.json
+            -o data-fi.json
 
-      - name: Build RSS feed
+      # 🟩 HAE ENGLANNINKIELINEN DATA
+      - name: Fetch Inderes data (EN)
         run: |
-          echo '<?xml version="1.0" encoding="UTF-8"?>' > feed.xml
-          echo '<rss version="2.0">' >> feed.xml
-          echo '<channel>' >> feed.xml
-          echo '<title>Inderes Publications</title>' >> feed.xml
-          echo '<link>https://ir.inderes.fi</link>' >> feed.xml
-          echo '<description>Automated feed built from Inderes API</description>' >> feed.xml
+          curl -s "https://ir-api.inderes.com/api/v1/publications?languages=en&startDate=$(date -I -d '-7 days')" \
+            -H "accept: application/json" \
+            -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
+            -o data-en.json
 
-          # Luo RSS itemit jokaisesta julkaisusta
-          jq -r '.publications[] | 
+      # 📦 RAKENNA FEEDIT
+      - name: Build RSS feeds
+        run: |
+          mkdir -p public
+
+          # --- Finnish feed ---
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > public/feed-fi.xml
+          echo '<rss version="2.0"><channel>' >> public/feed-fi.xml
+          echo '<title>Inderes Publications (FI)</title>' >> public/feed-fi.xml
+          echo '<link>https://ir.inderes.fi</link>' >> public/feed-fi.xml
+          echo '<description>Inderes-julkaisut suomeksi</description>' >> public/feed-fi.xml
+          jq -r '.publications[] |
             "<item>
               <title>\(.title | gsub("&"; "&amp;"))</title>
               <link>https://www.inderes.fi/releases/\(.id)</link>
               <guid>\(.id)</guid>
               <pubDate>\(.createdAt)</pubDate>
               <description><![CDATA[\(.html)]]></description>
-            </item>"' data.json >> feed.xml
+            </item>"' data-fi.json >> public/feed-fi.xml
+          echo '</channel></rss>' >> public/feed-fi.xml
 
-          echo '</channel></rss>' >> feed.xml
+          # --- English feed ---
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > public/feed-en.xml
+          echo '<rss version="2.0"><channel>' >> public/feed-en.xml
+          echo '<title>Inderes Publications (EN)</title>' >> public/feed-en.xml
+          echo '<link>https://ir.inderes.fi</link>' >> public/feed-en.xml
+          echo '<description>Inderes publications in English</description>' >> public/feed-en.xml
+          jq -r '.publications[] |
+            "<item>
+              <title>\(.title | gsub("&"; "&amp;"))</title>
+              <link>https://www.inderes.fi/releases/\(.id)</link>
+              <guid>\(.id)</guid>
+              <pubDate>\(.createdAt)</pubDate>
+              <description><![CDATA[\(.html)]]></description>
+            </item>"' data-en.json >> public/feed-en.xml
+          echo '</channel></rss>' >> public/feed-en.xml
 
-      - name: Commit and push
+      - name: Validate XML
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add feed.xml
-          git commit -m "Update feed $(date)" || echo "No changes"
-          git push
+          sudo apt-get update && sudo apt-get install -y libxml2-utils
+          xmllint --noout public/feed-fi.xml
+          xmllint --noout public/feed-en.xml
+
+      - name: Upload artifact for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
