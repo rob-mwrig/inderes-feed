@@ -1,4 +1,5 @@
 name: Update and Publish Inderes RSS feeds (titles only)
+
 on:
   schedule:
     - cron: "0 */1 * * *"
@@ -12,10 +13,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      # 🟦 HAE SUOMENKIELINEN DATA
+      # 🟦 Hae Suomenkielinen data
       - name: Fetch Inderes data (FI)
         run: |
           curl -s "https://ir-api.inderes.com/api/v1/publications?languages=fi&startDate=$(date -I -d '-7 days')" \
@@ -23,7 +25,7 @@ jobs:
             -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
             -o data-fi.json
 
-      # 🟩 HAE ENGLANNINKIELINEN DATA
+      # 🟩 Hae englanninkielinen data
       - name: Fetch Inderes data (EN)
         run: |
           curl -s "https://ir-api.inderes.com/api/v1/publications?languages=en&startDate=$(date -I -d '-7 days')" \
@@ -31,8 +33,8 @@ jobs:
             -H "x-api-key: ${{ secrets.INDERES_API_KEY }}" \
             -o data-en.json
 
-      # 📦 RAKENNA FEEDIT (ilman sisältöä)
-      - name: Build minimal RSS feeds
+      # 📦 Rakenna feedit + sivut
+      - name: Build feeds and viewer pages
         run: |
           mkdir -p public
 
@@ -65,6 +67,99 @@ jobs:
               <pubDate>\(.createdAt)</pubDate>
             </item>"' data-en.json >> public/feed-en.xml
           echo '</channel></rss>' >> public/feed-en.xml
+
+          # --- HTML viewers ---
+          cat > public/en.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <title>Robit – News</title>
+            <style>
+              body { font-family: "Segoe UI", sans-serif; margin: 1.5em; }
+              h2 { color: #004b8d; border-bottom: 2px solid #004b8d; padding-bottom: 0.3em; }
+              .feed-item { margin-bottom: 1em; border-bottom: 1px solid #ddd; padding-bottom: .8em; }
+              .feed-item a { color: #004b8d; font-weight: 600; text-decoration: none; }
+              .feed-item a:hover { text-decoration: underline; }
+              .pubDate { color: gray; font-size: 0.85em; }
+            </style>
+          </head>
+          <body>
+            <h2>Robit – News</h2>
+            <div id="feed">Loading feed…</div>
+            <script>
+              const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-en.xml';
+              const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
+              fetch(apiUrl)
+                .then(res => res.json())
+                .then(data => {
+                  const parser = new DOMParser();
+                  const xml = parser.parseFromString(data.contents, "text/xml");
+                  const items = xml.querySelectorAll("item");
+                  const container = document.getElementById("feed");
+                  container.innerHTML = "";
+                  if (items.length === 0) { container.textContent = "No news available."; return; }
+                  items.forEach(item => {
+                    const title = item.querySelector("title")?.textContent || "";
+                    const link = item.querySelector("link")?.textContent || "#";
+                    const pubDate = new Date(item.querySelector("pubDate")?.textContent || "").toLocaleDateString("en-GB");
+                    const div = document.createElement("div");
+                    div.className = "feed-item";
+                    div.innerHTML = \`<a href="\${link}" target="_blank">\${title}</a><div class="pubDate">\${pubDate}</div>\`;
+                    container.appendChild(div);
+                  });
+                })
+                .catch(() => document.getElementById("feed").textContent = "Feed unavailable.");
+            </script>
+          </body>
+          </html>
+          EOF
+
+          cat > public/fi.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="fi">
+          <head>
+            <meta charset="UTF-8">
+            <title>Robit – Uutiset</title>
+            <style>
+              body { font-family: "Segoe UI", sans-serif; margin: 1.5em; }
+              h2 { color: #004b8d; border-bottom: 2px solid #004b8d; padding-bottom: 0.3em; }
+              .feed-item { margin-bottom: 1em; border-bottom: 1px solid #ddd; padding-bottom: .8em; }
+              .feed-item a { color: #004b8d; font-weight: 600; text-decoration: none; }
+              .feed-item a:hover { text-decoration: underline; }
+              .pubDate { color: gray; font-size: 0.85em; }
+            </style>
+          </head>
+          <body>
+            <h2>Robit – Uutiset</h2>
+            <div id="feed">Ladataan syötettä…</div>
+            <script>
+              const feedUrl = 'https://robitgroup.github.io/inderes-feed/feed-fi.xml';
+              const apiUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(feedUrl)}`;
+              fetch(apiUrl)
+                .then(res => res.json())
+                .then(data => {
+                  const parser = new DOMParser();
+                  const xml = parser.parseFromString(data.contents, "text/xml");
+                  const items = xml.querySelectorAll("item");
+                  const container = document.getElementById("feed");
+                  container.innerHTML = "";
+                  if (items.length === 0) { container.textContent = "Ei uutisia."; return; }
+                  items.forEach(item => {
+                    const title = item.querySelector("title")?.textContent || "";
+                    const link = item.querySelector("link")?.textContent || "#";
+                    const pubDate = new Date(item.querySelector("pubDate")?.textContent || "").toLocaleDateString("fi-FI");
+                    const div = document.createElement("div");
+                    div.className = "feed-item";
+                    div.innerHTML = \`<a href="\${link}" target="_blank">\${title}</a><div class="pubDate">\${pubDate}</div>\`;
+                    container.appendChild(div);
+                  });
+                })
+                .catch(() => document.getElementById("feed").textContent = "Syötettä ei voitu ladata.");
+            </script>
+          </body>
+          </html>
+          EOF
 
       - name: Validate XML
         run: |
